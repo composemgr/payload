@@ -1,0 +1,55 @@
+# nginx proxy address - http://172.17.0.1:3005
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "1"
+
+services:
+  payload:
+    image: payloadcms/payload:latest
+    container_name: payload-app
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - payload
+    ports:
+      - "3005:3000"
+    environment:
+      TZ: ${TZ:-America/New_York}
+      DATABASE_URL: mongodb://${DB_ADMIN_NAME:-root}:${DB_ADMIN_PASS:-changeme_root_password}@payload-db:27017/${DB_CREATE_DATABASE_NAME:-payload}
+    volumes:
+      - ./rootfs/data/payload:/data
+      - ./rootfs/config/payload:/config
+    depends_on:
+      - payload-db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  payload-db:
+    image: mongo:7
+    container_name: payload-db
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - payload
+    environment:
+      TZ: ${TZ:-America/New_York}
+      MONGO_INITDB_DATABASE: ${DB_CREATE_DATABASE_NAME:-payload}
+      MONGO_INITDB_ROOT_USERNAME: ${DB_ADMIN_NAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_root_password}
+    volumes:
+      - ./rootfs/db/mongodb/payload:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  payload:
+    external: false
