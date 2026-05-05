@@ -51,9 +51,9 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/payload` - Data storage
-- `./rootfs/config/payload` - Data storage
-- `./rootfs/data/db/mongodb/payload` - Data storage
+- `./volumes/data/payload` - Data storage
+- `./volumes/config/payload` - Data storage
+- `./volumes/data/db/mongodb/payload` - Data storage
 
 ## 🔐 Security
 
