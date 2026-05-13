@@ -16,12 +16,16 @@ services:
     logging: *default-logging
     networks:
       - payload
+      - proxy
+      - cloudflare
     ports:
       - "172.17.0.1:3005:3000"
     environment:
       TZ: ${TZ:-America/New_York}
       DATABASE_URI: mongodb://${DB_ADMIN_USER:-root}:${DB_ADMIN_PASS:-changeme_admin_password}@payload-db:27017/${DB_CREATE_DATABASE_NAME:-payload}
       PAYLOAD_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
+      CONTAINER_NAME: payload-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     volumes:
       - ./volumes/data/payload:/home/node/app/media
     depends_on:
@@ -31,6 +35,22 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://payload-app:3000'
+      - 'cloudflare.hostname=payload.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.payload-app.entrypoints=http'
+      - 'traefik.http.routers.payload-app-secure.tls=true'
+      - 'traefik.http.routers.payload-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.payload-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.payload-app.middlewares=payload-app-https-redirect'
+      - 'traefik.http.routers.payload-app-secure.entrypoints=https'
+      - 'traefik.http.routers.payload-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.payload-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.payload-app-secure.service=payload-app'
+      - 'traefik.http.services.payload-app.loadbalancer.server.port=3000'
 
   payload-db:
     image: mongo:latest
@@ -45,6 +65,7 @@ services:
       MONGO_INITDB_DATABASE: ${DB_CREATE_DATABASE_NAME:-payload}
       MONGO_INITDB_ROOT_USERNAME: ${DB_ADMIN_USER:-root}
       MONGO_INITDB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_admin_password}
+      CONTAINER_NAME: payload-db
     volumes:
       - ./volumes/data/db/mongodb/payload:/data/db
     healthcheck:
@@ -56,3 +77,7 @@ services:
 networks:
   payload:
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true
