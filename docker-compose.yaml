@@ -22,7 +22,7 @@ services:
       - "172.17.0.1:3005:3000"
     environment:
       TZ: ${TZ:-America/New_York}
-      DATABASE_URI: mongodb://${DB_ADMIN_USER:-root}:${DB_ADMIN_PASS:-changeme_admin_password}@payload-db:27017/${DB_CREATE_DATABASE_NAME:-payload}
+      DATABASE_URI: mongodb://${DB_ADMIN_NAME:-root}:${DB_ADMIN_PASS:-changeme_admin_password}@payload-db:27017/${DB_CREATE_DATABASE_NAME:-payload}
       PAYLOAD_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
       CONTAINER_NAME: payload-app
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
@@ -63,7 +63,7 @@ services:
     environment:
       TZ: ${TZ:-America/New_York}
       MONGO_INITDB_DATABASE: ${DB_CREATE_DATABASE_NAME:-payload}
-      MONGO_INITDB_ROOT_USERNAME: ${DB_ADMIN_USER:-root}
+      MONGO_INITDB_ROOT_USERNAME: ${DB_ADMIN_NAME:-root}
       MONGO_INITDB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_admin_password}
       CONTAINER_NAME: payload-db
     volumes:
