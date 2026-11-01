@@ -1,25 +1,25 @@
-# nginx proxy address - http://172.17.0.1:3005
+# nginx proxy address - http://172.17.0.1:64296
 
 name: payload
 x-logging: &default-logging
-  driver: json-file
   options:
-    max-size: "5m"
-    max-file: "1"
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
 
 services:
   payload:
-    image: payloadcms/payload:latest
+    image: node:24-alpine
     pull_policy: always
     container_name: payload-app
+    working_dir: /home/node/app
+    command: sh -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm dev"
     restart: always
     logging: *default-logging
+    ports:
+      - '172.17.0.1:64296:3000'
     networks:
       - payload
-      - proxy
-      - cloudflare
-    ports:
-      - "172.17.0.1:3005:3000"
     environment:
       TZ: ${TZ:-America/New_York}
       DATABASE_URI: mongodb://${DB_ADMIN_NAME:-root}:${DB_ADMIN_PASS:-changeme_admin_password}@payload-db:27017/${DB_CREATE_DATABASE_NAME:-payload}
@@ -27,30 +27,16 @@ services:
       CONTAINER_NAME: payload-app
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     volumes:
+      - .:/home/node/app
+      - payload_node_modules:/home/node/app/node_modules
       - ./volumes/data/payload:/home/node/app/media
     depends_on:
       - payload-db
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-    labels:
-      - 'traefik.enable=true'
-      - 'cloudflare.enable=true'
-      - 'traefik.docker.network=proxy'
-      - 'cloudflare.service=http://payload-app:3000'
-      - 'cloudflare.hostname=payload.${CLOUDFLARE_ZONE_NAME:-}'
-      - 'traefik.http.routers.payload-app.entrypoints=http'
-      - 'traefik.http.routers.payload-app-secure.tls=true'
-      - 'traefik.http.routers.payload-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.middlewares.payload-app-https-redirect.redirectscheme.scheme=https'
-      - 'traefik.http.routers.payload-app.middlewares=payload-app-https-redirect'
-      - 'traefik.http.routers.payload-app-secure.entrypoints=https'
-      - 'traefik.http.routers.payload-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.routers.payload-app-secure.tls.certresolver=cloudflare'
-      - 'traefik.http.routers.payload-app-secure.service=payload-app'
-      - 'traefik.http.services.payload-app.loadbalancer.server.port=3000'
 
   payload-db:
     image: mongo:latest
@@ -76,8 +62,9 @@ services:
 
 networks:
   payload:
+    name: payload
     external: false
-  proxy:
-    external: true
-  cloudflare:
-    external: true
+
+volumes:
+  payload_node_modules:
+    name: payload_node_modules

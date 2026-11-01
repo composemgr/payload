@@ -1,0 +1,73 @@
+name: payload
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  payload:
+    image: node:24-alpine
+    pull_policy: always
+    container_name: payload-app
+    working_dir: /home/node/app
+    command: sh -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm dev"
+    restart: always
+    logging: *default-logging
+    labels:
+      - 'cloudflare.enable=true'
+      - 'cloudflare.service=http://payload-app:3000'
+      - 'cloudflare.hostname=${BASE_HOST_NAME:-$HOSTNAME}'
+    networks:
+      - payload
+      - cloudflare
+    environment:
+      TZ: ${TZ:-America/New_York}
+      DATABASE_URI: mongodb://${DB_ADMIN_NAME:-root}:${DB_ADMIN_PASS:-changeme_admin_password}@payload-db:27017/${DB_CREATE_DATABASE_NAME:-payload}
+      PAYLOAD_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
+      CONTAINER_NAME: payload-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+    volumes:
+      - .:/home/node/app
+      - payload_node_modules:/home/node/app/node_modules
+      - ./volumes/data/payload:/home/node/app/media
+    depends_on:
+      - payload-db
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  payload-db:
+    image: mongo:latest
+    pull_policy: always
+    container_name: payload-db
+    restart: always
+    logging: *default-logging
+    networks:
+      - payload
+    environment:
+      TZ: ${TZ:-America/New_York}
+      MONGO_INITDB_DATABASE: ${DB_CREATE_DATABASE_NAME:-payload}
+      MONGO_INITDB_ROOT_USERNAME: ${DB_ADMIN_NAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_admin_password}
+      CONTAINER_NAME: payload-db
+    volumes:
+      - ./volumes/data/db/mongodb/payload:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  payload:
+    name: payload
+    external: false
+  cloudflare:
+    external: true
+
+volumes:
+  payload_node_modules:
+    name: payload_node_modules
